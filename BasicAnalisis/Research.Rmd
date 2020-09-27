@@ -1,0 +1,204 @@
+---
+  
+title: "BasicStatistic"
+author: "Maksym Rud'"
+date: "13 09 2020"
+output: pdf_document
+  
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(e1071)
+library(nortest)
+library(circular)
+nsim <- function(n, m = 0, s = 1) {
+    z <- rnorm(n)
+    m + s * ((z - mean(z)) / sd(z))
+}
+
+nboot <- function(x, R) {
+    n <- length(x)
+    m <- mean(x)
+    s <- sd(x)
+    do.call(rbind,
+            lapply(1 : R,
+                   function(i) {
+                       xx <- sort(nsim(n, m, s))
+                       p <- seq_along(x) / n - 0.5 / n
+                       data.frame(x = xx, p = p, sim = i)
+    }))
+}
+
+```
+
+## Father's Hight Statistics
+
+The table below gives the heights of fathers and their sons, based on a famous experiment by Karl Pearson around 1903. The number of cases is 1078. Random noise was added to the original data, to produce heights to the nearest 0.1 inch.
+
+```{r fathers}
+my_data <- read.delim(file.choose())
+
+knitr::kable(head(my_data[1:5,]), "simple")
+```
+
+Here are some basic evaluations of the data
+
+```{r f.stat}
+
+print(c("Mean", mean(my_data$Father)))
+
+print(c("Median", median(my_data$Father)))
+
+print(c("Variance", var(my_data$Father)))
+
+print(c("Standart deviation", sd(my_data$Father)))
+
+print(c("coef of variance", sd(my_data$Father)/mean(my_data$Father)))
+
+print(c("Range of the set of data", max(my_data$Father) - min(my_data$Father)))
+
+print(c("interquartile range", IQR(my_data$Father, na.rm = FALSE)))
+
+
+```
+
+## Box Plot
+
+The plot is representing interquartile range, mean and "vityk" values and informal information about density distribution.
+
+```{r ploting}
+
+ggplot(my_data) +
+  aes(y = unlist(my_data[2])) +
+  geom_boxplot() +
+  coord_flip() +
+  labs(
+    y = "heights"
+  )
+```
+
+## Quartiles
+
+```{r quartiles}
+
+quantile(my_data$Father)
+
+```
+
+## Summary
+
+```{r charct}
+
+summary(my_data$Father)
+
+```
+
+## First and Ninth Deciles
+
+```{r deciles}
+quantile(my_data$Father, prob = seq(0, 1, length = 11), type = 5)[2]
+quantile(my_data$Father, prob = seq(0, 1, length = 11), type = 5)[10]
+
+```
+
+## Skewness
+
+```{r skewness}
+
+skewness(my_data$Father)
+
+```
+
+## Kurtosis
+
+```{r kurtosis}
+
+kurtosis(my_data$Father)
+
+```
+
+## Histograms based on 
+
+```{r stand_gist}
+
+hist(my_data$Father, main = "Standart rule", xlab = "height", freq = FALSE)
+std = sqrt(var(my_data$Father))
+curve(dnorm(x,mean = mean(my_data$Father), sd = std), add = TRUE, col="red")
+
+```
+
+
+```{r sturge}
+
+hist(my_data$Father, main = "Sturges rule", xlab = "height", ylim = c(0, 200))
+
+```
+
+
+```{r Freedman-Diaconis}
+
+hist(my_data$Father,main = "Freedman-Diaconis rule", xlab = "height", breaks = "FD", freq = FALSE, 
+     xlim = c(56, 76), ylim = c(0, 0.2))
+curve(dnorm(x,mean = mean(my_data$Father), sd = std), col="red", add = TRUE)
+
+```
+
+```{r Scotts, warning=FALSE}
+
+hist(my_data$Father,main = "Scott's rule", xlab = "height",  breaks = "Scott", freq = FALSE, xlim = c(56, 76))
+curve(dnorm(x,mean = mean(my_data$Father), sd = std), col="red", add = TRUE)
+
+
+```
+
+## Creating a Normal Quantile–Quantile Plot
+
+Sometimes it’s important to know if your data is normally distributed. A quantile–quantile (Q–Q) plot is a good first check.
+
+```{r qq}
+
+ggplot(my_data, aes(sample = Father)) +
+  stat_qq() +
+  stat_qq_line() +
+  labs(title = "Q-Q normal plot for father's hights")
+
+```
+
+If the data had a perfect normal distribution, then the points would fall exactly on the diagonal line. Many points are close, especially in the middle section in particular.
+
+##  Creating a Normal Probability-Probability plot
+
+```{r pp}
+
+m <- mean(my_data$Father)
+s <- sd(my_data$Father)
+n <- nrow(my_data)
+p <- (1 : n) / n - 0.5 / n
+gb <- nboot(my_data$Father, 50)
+pp <- ggplot() +
+geom_line(aes(x = p, y = pnorm(x, m, s), group = sim),
+          color = "gray", data = gb)
+pp + 
+geom_point(aes(x = p, y = sort(pnorm(Father, m, s))), data = (my_data))
+
+```
+
+## Shapiro, Anderson-Darling, Cramer-von Mises, Pearson chi-square, Kolmogorov normality test
+
+```{r test, warning=FALSE}
+
+shapiro.test(my_data$Father)
+
+ad.test(my_data$Father)
+
+cvm.test(my_data$Father)
+
+pearson.test(my_data$Father)
+
+ks.test(x = my_data$Father, y = pnorm(nrow(my_data), m, s))
+```
+
+
