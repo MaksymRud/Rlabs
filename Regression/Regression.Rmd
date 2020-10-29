@@ -1,0 +1,166 @@
+---
+title: "RegressioCovid"
+author: "Maksym Rud'"
+date: "16 10 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(cds)
+library(ggplot2)
+total_data <- read.csv("Data/owid-covid-data.csv")
+
+france_data <- subset(total_data, location == "France", select = c("date", "new_cases"))
+france_data$date <- as.numeric(france_data$date)
+france_data <- france_data[c(150:nrow(france_data)),]
+for(i in c(1:nrow(france_data))){
+  if(france_data[i,2] < 0){
+    france_data[i,2] <- abs(france_data[i,2])
+  }
+  else if(france_data[i,2] == 0){
+    france_data[i,2] <- 1
+  }
+}
+
+
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Regression Model
+
+Let's investigate our model to check if it has any paticular pattern.
+```{r cars}
+
+plot(france_data$date, france_data$new_cases, main="Each day new cases changes",
+     xlab="Day", ylab="New Corona Virus Cases")
+```
+
+Curve of observations seems like an exponential pattern of growth. 
+
+Let's esume that this model has nonlinear model like.
+
+$$y = \alpha e^{\beta x}$$
+
+$$log(y) = log(\alpha) + \beta x $$
+
+
+But before implementing this method we should find suitable starting values for our estimates. I used linear model for estimating
+
+
+## Finding right starting values
+
+```{r pressure}
+model.0 <- lm(log(new_cases) ~ date, data=france_data)  
+alpha.0 <- exp(coef(model.0)[1])
+beta.0 <- coef(model.0)[2]
+
+startval <- list(alpha = alpha.0, beta = beta.0)
+startval
+```
+
+## Using Non-linear Least squares method
+
+
+```{r fittingmodel}
+
+model <- nls(new_cases ~ alpha * exp(beta*date), data=france_data, start = startval)
+
+plot(france_data$date, france_data$new_cases, main="Fitting Exponential",
+     xlab="Day", ylab="New Corona Virus Cases")
+lines(france_data$date, predict(model, list(x = france_data$date)), col = 'red', lwd =3)
+```
+
+
+It seems like a suitable model for our data. Steel we need to check if the tale didn't ruined everything
+
+## Residual Plots
+
+```{r res}
+data.res <- residuals(model)
+plot(france_data$new_cases, data.res, xlab = "New_cases", ylab = "Residuals", main = "Residuals vs fit plot")
+```
+
+```{r respred}
+data.res <- residuals(model)
+plot(france_data$date, data.res, xlab = "Date", ylab = "Residuals", main = "Residuals vs predictor plot")
+```
+
+## Q-Q plot residuals
+
+```{r resqq}
+qqnorm(data.res, ylab="Standardized Residuals", xlab="Normal Scores", main="Covid-19 cases")
+
+```
+
+
+
+## Measuring a fit
+
+```{r measfit}
+(RSS.p <- sum(residuals(model)^2))
+(TSS <- sum((france_data$new_cases - mean(france_data$new_cases))^2)) 
+1 - (RSS.p/TSS)  # R-squared measure
+```
+
+As we can see may be we should better use polinomial function
+
+## Log of our Data
+```{r plotting}
+plot(france_data$date, log(france_data$new_cases), main="Each day new cases changes logged",
+     xlab="Day", ylab="New Corona Virus Cases")
+```
+Let's esume...
+
+$$ log(y) = \beta_1x$$
+where $x$ is our date
+
+
+
+## Fitting polinomial model
+
+```{r plmod}
+model.lm <- lm(log(new_cases) ~ date, data = france_data)
+```
+
+
+## Fitting on a plot
+
+```{r fitplot}
+plot(france_data$date, log(france_data$new_cases), main="Fitting Polynomial",
+     xlab="Day", ylab="New Corona Virus Cases")
+lines(france_data$date, predict(model.lm, data=france_data), col = 'red', lwd = 2)
+
+```
+
+## Residual Plots
+
+### Seventh Polynom
+
+```{r resid7}
+data.res <- residuals(model.lm)
+plot(log(france_data$new_cases), data.res, xlab = "New_cases", ylab = "Residuals", main = "Residuals poly7 vs fit plot")
+```
+
+```{r respred7}
+data.res <- residuals(model.lm)
+plot(france_data$date, data.res, xlab = "Date", ylab = "Residuals", main = "Residuals poly7 vs predictor plot")
+```
+
+## Q-Q plot residuals
+
+```{r resq}
+qqnorm(data.res, ylab="Standardized Residuals", xlab="Normal Scores", main="Covid-19 cases")
+
+```
+## Measuring a fit
+
+### Seventh
+
+```{r measfitpoly7}
+(RSS.p <- sum(residuals(model.lm)^2))
+(TSS <- sum((france_data$new_cases - mean(france_data$new_cases))^2)) 
+1 - (RSS.p/TSS)  # R-squared measure
+```
+
+After all we create a approximate model of our data 

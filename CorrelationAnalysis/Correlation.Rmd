@@ -4,27 +4,105 @@ author: "Maksym Rud'"
 date: "27 09 2020"
 output: pdf_document
 ---
+# Correlation Analysis
+## Europe 2016 data_set
 
 ```{r setup, include=FALSE}
+
+library(psych)
+library(corrplot)
+library(corrr)
+
+data_crime <- read.csv("Europe/crime_2016.csv")
+data_gdp <- read.csv("Europe/gdp_2016.csv")
+data_life_expectancy <- read.csv("Europe/life_expectancy_2016.csv")
+data_low_savings <- read.csv("Europe/low_savings_2016.csv")
+data_work_hours <-read.csv("Europe/work_hours_2016.csv")
+
+total <- merge(data_crime, data_gdp, by="country")
+total <- merge(total, data_life_expectancy , by = "country")
+total <- merge(total, data_low_savings , by = "country")
+data_europe <- merge(total, data_work_hours, by = "country")
+
+
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+## Data
+```{r data}
+head(data_europe)
 ```
 
-## Including Plots
+## Matrix plot
 
-You can also embed plots, for example:
+### Pearson matrix plot
+```{r matrixplot}
+pairs.panels(data_europe[,2:6], 
+             method = "pearson", # correlation method
+             hist.col = "#00AFBB",
+             density = TRUE,  # show density plots
+             ellipses = TRUE # show correlation ellipses
+             )
 
-```{r pressure, echo=FALSE}
-plot(pressure)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+## Corr Plot
+
+```{r corrplot, echo=FALSE}
+EU <- cor(data_europe[,2:6])
+corrplot(EU, method ="circle")
+```
+
+### Cluster
+
+```{r corrplot2, echo=FALSE}
+EU <- cor(data_europe[,2:6])
+corrplot(EU, method ="shade", order="hclust")
+```
+
+## Graph plot
+
+```{r graphplot}
+network_plot(EU)
+```
+
+## Tests for percent of low savings and avg hours of work
+
+```{r test1}
+res <- cor.test(data_europe$avg_hrs_worked, data_europe$prct_low_savings, method = "pearson")
+res
+```
+
+### The p-value of the test is  0.003338, which is less than the significance level alpha = 0.05. We can conclude that low savings and avg hours of work are significantly correlated with a correlation coefficient of 0.503076 and p-value of 0.003338 .
+
+```{r test12, warning=FALSE}
+res <- cor.test(data_europe$avg_hrs_worked, data_europe$prct_low_savings, method = "spearman")
+res
+```
+
+```{r test13, warning=FALSE}
+res <- cor.test(data_europe$avg_hrs_worked, data_europe$prct_low_savings, method = "kendall")
+res
+```
+
+## Tests for percent of low savings and life excpectations
+
+```{r test2}
+res <- cor.test(data_europe$life_expect, data_europe$prct_low_savings, method = "pearson")
+res
+```
+
+### The p-value of the test is   0.0002015, which is less than the significance level alpha = 0.05. We can conclude that low savings and life excpectations are significantly correlated with a correlation coefficient of -0.6113428 and p-value of 0.0002015.
+
+```{r test3, warning=FALSE}
+res <- cor.test(data_europe$life_expect, data_europe$prct_low_savings, method = "spearman")
+res
+```
+
+```{r test4, warning=FALSE}
+res <- cor.test(data_europe$life_expect, data_europe$prct_low_savings, method = "kendall")
+res
+```
+
+
+
