@@ -1,0 +1,131 @@
+---
+title: "ANOVA"
+author: "Maksym Rud'"
+date: "03 11 2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+library(car)
+drying_data <- data.frame("Cloth_cat" = c(1, 1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,3,3,3,3),
+                          "dry_type" = c(1, 1, 1, 2,2,2,3,3,3,4,4,4,1,1,1,2,2,2,3,3,3,4,4,4,1,1,1,2,2,2,3,3,3,4,4,4),
+                          "energ_effect"= c(1.157, 1.189, 1.190, 1.236, 1.244, 1.264, 2.140, 2.210, 2.190, 1.620, 1.520, 1.530, 1.418, 1.519, 1.380, 1.446, 1.441, 1.425, 2.117, 2.288, 2.500, 1.719, 1.764, 1.524, 1.360, 1.224, 1.291, 1.333, 1.348, 1.356, 2.180, 2.328, 2.342, 1.571, 1.567, 1.469),
+                          "cycle_time" = c(25.83, 26.28, 26.05, 26.61, 27.37, 27.08, 26.52, 28.36, 26.74, 22.21, 20.67, 21.94, 31.26, 33.50, 29.31, 30.25, 30.41, 29.85, 25.61, 30.41, 31.10, 24.62, 24.19, 24.00, 26.13, 23.01, 24.06, 24.73, 25.15, 24.81, 23.76, 24.86, 26.74, 15.80, 17.40, 15.82))
+drying_data$dry_type <- factor(drying_data$dry_type, levels = c(1,2,3,4), labels = c("Electr", "Bi-dir", "Gas-Fired", "LPG-Fired"))
+drying_data$Cloth_cat <- factor(drying_data$Cloth_cat, levels = c(1, 2, 3), labels = c("Towels", "Jeans", "Thermal Clothing"))
+res.aov3 <- aov(cycle_time ~ Cloth_cat + dry_type + Cloth_cat:dry_type, data = drying_data)
+summary(res.aov3)
+```
+
+## Two-way ANOVA
+
+Source: W.M. To, T.W. Yu, T.M. Lai, S.P. Li (2007). "Characterization of
+Commercial Clothes Dryers Based on Energy-Efficiency Analysis,"
+International Journal of Clothing Science and Technology,
+Vol. 19, #5, pp. 270-290.
+
+Desription: Replicates each of 3 clothing categories (1=Towels,
+2=Jeans, 3=Thermal Clothing) for 4 dryer types (1=Electric Dryer, 
+2=Bi-directional Electric dryer, 3=Town Gas-Fired Dryer, 4=LPG-Fired dryer)
+
+First of all, here are first 5 rows of the data
+
+```{r head}
+head(drying_data)
+```
+
+## Frequency table
+
+We have 3X4 design cells with the factors being clothing categories and dryer types and 3 subjects in each cell. Here, we have a balanced design. In the next sections I’ll analyse data from balanced designs
+
+```{r pressure, echo=FALSE}
+table(drying_data$Cloth_cat, drying_data$dry_type)
+```
+
+## Visualize data
+
+Two-way interaction plot, which plots the mean (or other summary) of the response for two-way combinations of factors, thereby illustrating possible interactions.
+
+Where red is for Towels, Blue is for Jeans and Green - Thermal Clothing
+ 
+Here we can see some descending tendency on time for spending for a drying cycle.
+
+
+```{r boxplot}
+boxplot(cycle_time ~ Cloth_cat*dry_type , data = drying_data,
+        main = "Plot of cloth category by dry type",
+        col = c("red", "steelblue", "yellow"), frame = FALSE)
+```
+
+```{r boxplot1}
+boxplot(cycle_time ~ Cloth_cat , data = drying_data,
+        main = "Plot of cloth category by dry type",
+        col = c("skyblue", "grey", "green"), frame = FALSE)
+```
+
+```{r boxplot2}
+boxplot(cycle_time ~ dry_type , data = drying_data,
+        main = "Plot of dry type",
+        col = c("red", "steelblue", "yellow", "green"), frame = FALSE)
+```
+
+Also we can conclude that obviously Town Gas-Fired dryers need more energy per kilogram of a cloth.
+
+```{r boxplot3}
+boxplot(energ_effect ~ Cloth_cat*dry_type , data = drying_data,
+        main = "Plot of cloth category by dry type",
+        col = c("red", "steelblue", "yellow"), frame = FALSE)
+```
+
+## Check the homogeneity of variance assumption
+
+ANOVA assumes that the data are normally distributed and the variance across groups are homogeneous. We can check that with some diagnostic plots.
+
+### Residuals plot
+
+```{r Homogenvar}
+plot(res.aov3, 1)
+```
+
+Points 19, 21 and 14 are detected as outliers, which can severely affect normality and homogeneity of variance
+
+### Levene's test
+
+```{r levent}
+leveneTest(cycle_time ~ Cloth_cat*dry_type, data = drying_data)
+```
+
+From the output above we can see that the p-value is not less than the significance level of 0.05. This means that there is no evidence to suggest that the variance across groups is statistically significantly different. Therefore, we can assume the homogeneity of variances in the different treatment groups.
+
+## Compute two-way ANOVA test
+
+We want to know if drying time and energy consuption а depends on clothing category or drying type.
+
+```{r design1}
+plot.design(drying_data)
+```
+
+
+```{r anvtest }
+
+res.aov3 <- aov(energ_effect ~ Cloth_cat + dry_type + Cloth_cat:dry_type, data = drying_data)
+summary(res.aov3)
+
+res.aov3 <- aov(cycle_time ~ Cloth_cat + dry_type + Cloth_cat:dry_type, data = drying_data)
+summary(res.aov3)
+```
+
+From the ANOVA table we can conclude that both clothing category and drying type are statistically significant for both predicted values. However in Energy spending drying type is the most significant factor variable. These results would lead us to believe that changing the way of drying clothes or the clothe, will impact significantly the mean drying time.
+
+Based on the p-values and a significance level of 0.05
+
+```{r tukey }
+TukeyHSD(res.aov3, which = "dry_type")
+```
+
+```{r homo}
+plot(TukeyHSD(res.aov3, which = "dry_type"), las = 1)
+```
+

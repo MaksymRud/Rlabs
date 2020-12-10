@@ -1,0 +1,193 @@
+---
+title: "TimeSeries"
+author: "Maksym Rud'"
+date: "15 11 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(cds)
+library(ggplot2)
+library("TTR")
+library(tseries)
+library(imputeTS)
+library(forecast)
+library(fpp3) 
+library(tidyverse)
+library(tidyquant)
+library(seastests)
+library(astsa)
+total_data <- read.csv("owid-covid-data.csv")
+france_data <- total_data[which(total_data$location == "France") ,c("date", "new_cases")]
+france_data <- france_data[c(150:nrow(france_data)),]
+for(i in c(1:nrow(france_data))){
+  if(france_data[i,2] < 0){
+    france_data[i,2] <- abs(france_data[i,2])
+  }
+  else if(france_data[i,2] == 0){
+    france_data[i,2] <- NA
+  }
+}
+france_data$date <- as.Date(france_data$date, format = "%d-%m-%y")
+france_dataTS <- ts(france_data$new_cases,    
+           start = c(2020, 5),
+           frequency = 7)
+
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Time Series Plotting
+
+As we have some NA values in our observations. We should make an imputation to be sure that we can rely on further data processing and analysis steps. I will use interpolation method.
+
+```{r imputing}
+france_dataTS.withoutNA <- na_interpolation(france_dataTS)
+```
+
+Let's investigate our model to check if it has any paticular pattern.
+```{r cars}
+plot.ts(france_dataTS.withoutNA)
+```
+
+Curve of observations seems like an exponential tendency of growth and has an 7 days seasoning
+
+Thus, we can try to estimate the trend component of this time series by smoothing using a simple moving average and seasonal decomposing. To smooth the time series using a simple moving average and plot the smoothed time series data, we type:
+
+## Smoothing time series data
+
+```{r smoothed}
+france_decomp <- decompose(france_dataTS.withoutNA)
+plot(france_decomp)
+```
+
+We can see that our variance is increasing over time. So it will be more convinient to log our function
+
+```{r logged}
+plot.ts(log(france_dataTS.withoutNA))
+france_dataTS.withoutNA.LOG <- log10(france_dataTS.withoutNA)
+```
+
+```{r smoothing}
+plot(france_dataTS.withoutNA.LOG,main='Simple Moving Average (SMA)',ylab='Passengers')
+```
+Checking Seasonality
+```{r season}
+summary(wo(france_dataTS.withoutNA.LOG))
+```
+
+
+```{r smoothedlog}
+france_decomp <- decompose(france_dataTS.withoutNA, type = "multiplicative")
+plot(france_decomp)
+```
+
+## Test if Time Series is Stationary
+
+```{r stationary}
+plot(france_dataTS.withoutNA.LOG)
+```
+
+```{r autocorrel}
+acfdata <- acf(france_dataTS.withoutNA.LOG)
+acfdata <- pacf(france_dataTS.withoutNA.LOG) 
+```
+
+```{r seasonaladj}
+france_dataTS.withoutNA.LOG.differenced <- diff(france_dataTS.withoutNA.LOG, lag = 7)
+summary(wo(france_dataTS.withoutNA.LOG.differenced))
+plot(france_dataTS.withoutNA.LOG.differenced, type = "l")
+```
+Autoregressive component: A purely AR model forecasts only using a combination of the past values sorta like linear regression where the number of AR terms used is directly proportional to the number of previous periods taken into consideration for the forecasting.
+Use AR terms in the model when the.
+ACF plots show autocorrelation decaying towards zero
+PACF plot cuts off quickly towards zero
+ACF of a stationary series shows positive at lag-1
+
+```{r autocorrel2}
+acfdata <- acf(france_dataTS.withoutNA.LOG.differenced)
+acfdata <- pacf(france_dataTS.withoutNA.LOG.differenced) 
+```
+
+```{r stationtest}
+adf.test(france_dataTS.withoutNA.LOG.differenced)
+```
+
+
+```{r auto}
+fit0 <- auto.arima(france_dataTS.withoutNA.LOG, d = 1, approximation = FALSE, seasonal = TRUE)
+```
+
+
+```{r AIC}
+AIC(arima(france_dataTS.withoutNA.LOG, order = c(0, 1, 1), seasonal = list(order = c(1, 0, 0), period = 7)))
+AIC(arima(france_dataTS.withoutNA.LOG, order = c(0, 1, 1), seasonal = list(order = c(1, 0, 1), period = 7)))
+AIC(arima(france_dataTS.withoutNA.LOG, order = c(1, 1, 0), seasonal = list(order = c(1, 0, 1), period = 7)))
+AIC(arima(france_dataTS.withoutNA.LOG, order = c(1, 1, 0), seasonal = list(order = c(1, 0, 0), period = 7)))
+AIC(arima(france_dataTS.withoutNA.LOG, order = c(1, 0, 1), seasonal = list(order = c(1, 1, 2), period = 7)))
+fit23 <- arima(france_dataTS.withoutNA.LOG, order = c(1, 0, 1), seasonal = list(order = c(1, 1, 2), period = 7))
+fit <-  arima(france_dataTS.withoutNA.LOG, order = c(1, 1, 0), seasonal = list(order = c(1, 0, 0), period = 7))
+fit1 <- arima(france_dataTS.withoutNA.LOG, order = c(0, 1, 1), seasonal = list(order = c(1, 0, 1), period = 7))
+
+```
+
+```{r residual}
+
+summary(fit23)
+checkresiduals(fit23)
+summary(fit0)
+checkresiduals(fit0)
+summary(fit)
+checkresiduals(fit)
+summary(fit1)
+checkresiduals(fit1)
+```
+
+```{r forecast23}
+pred = forecast(fit23, h = 30)
+pred$x <- 10^(pred$x)
+pred$mean <- 10^(pred$mean)
+pred$lower <- 10^(pred$lower)
+pred$upper <- 10^(pred$upper)
+#plot(france_dataTS.withoutNA,type='l',xlim = c(2020, 2045), ylim = c(0, 50000), xlab = 'Day',ylab = 'New cases')
+plot(pred, ylim = c(0, 50000))
+```
+
+```{r forecast0}
+pred = forecast(fit0, h = 20)
+pred$x <- 10^(pred$x)
+pred$mean <- 10^(pred$mean)
+pred$lower <- 10^(pred$lower)
+pred$upper <- 10^(pred$upper)
+#plot(france_dataTS.withoutNA,type='l',xlim = c(2020, 2045), ylim = c(0, 50000), xlab = 'Day',ylab = 'New cases')
+plot(pred, ylim = c(0, 50000))
+```
+
+
+```{r forecast1}
+pred = forecast(fit1, h = 20)
+pred$x <- 10^(pred$x)
+pred$mean <- 10^(pred$mean)
+pred$lower <- 10^(pred$lower)
+pred$upper <- 10^(pred$upper)
+plot(pred, ylim = c(0, 50000))
+```
+
+
+
+```{r fore}
+#sarima(france_dataTS.withoutNA.LOG, 1, 1, 0, 1, 0, 1, 7)
+sarima(france_dataTS.withoutNA.LOG, 1, 0, 1, 1, 1, 2, 7)
+sarima(france_dataTS.withoutNA.LOG, 0, 1, 1, 1, 0, 0, 7)
+```
+
+```{r expSmoothing}
+fit <- ets(france_dataTS.withoutNA, lambda = BoxCox.lambda(france_dataTS.withoutNA))
+fit1 <- HoltWinters(france_dataTS.withoutNA)
+fit
+checkresiduals(fit)
+autoplot(forecast(fit))
+fit1
+autoplot(forecast(fit))
+```
+

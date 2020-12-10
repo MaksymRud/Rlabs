@@ -1,0 +1,140 @@
+---
+title: "Cluster"
+author: "Maksym Rud'"
+date: "22 11 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(e1071)
+library(cluster)
+library(factoextra)
+library(fossil)
+data("USArrests")
+df <- USArrests
+df <- na.omit(df)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+As we don’t want the clustering algorithm to depend to an arbitrary variable
+unit, we start by scaling/standardizing the data.
+
+```{r cars}
+df <- scale(df)
+head(df, n = 3)
+```
+
+## Finding optimal number of clusters
+
+Here, we provide a simple solution. The idea is to compute k-means clustering using
+di
+erent values of clusters k. Next, the wss (within sum of square) is drawn according
+to the number of clusters. The location of a bend (knee) in the plot is generally
+considered as an indicator of the appropriate number of clusters.
+
+```{r pressure}
+fviz_nbclust(df, kmeans, method = "wss") +
+geom_vline(xintercept = 4, linetype = 2)
+```
+
+
+```{r}
+fviz_nbclust(df, kmeans, method = "silhouette")
+```
+
+## Compute k-mean clustering
+
+As k-means clustering algorithm starts with k randomly selected centroids, it’s always recommended to use the set.seed() function in order to set a seed for R’s random number generator. The aim is to make reproducible the results, so that the reader of this article will obtain exactly the same results as those shown below.
+
+```{r}
+set.seed(123)
+km.res <- kmeans(df, 4, nstart = 25)
+```
+
+### Result
+
+```{r}
+print(km.res)
+```
+
+```{r}
+aggregate(USArrests, by = list(cluster=km.res$cluster), mean)
+```
+
+```{r}
+dd <- cbind(USArrests, cluster = km.res$cluster)
+head(dd)
+```
+
+```{r}
+km.res$size
+```
+
+## Visualizing
+
+```{r}
+fviz_cluster(km.res, data = df, palette = c("#2E9FDF", "#00AFBB", "#E7B800", "#FC4E07"),
+  ellipse.type = "euclid", # Concentration ellipse
+  star.plot = TRUE, # Add segments from centroids to items
+  repel = TRUE, # Avoid label overplotting (slow)
+  ggtheme = theme_minimal()
+  )
+```
+
+## Using hierarchical K-Means Clustering
+
+The algorithm is summarized as follow:
+1. Compute hierarchical clustering and cut the tree into k-clusters
+2. Compute the center (i.e the mean) of each cluster
+3. Compute k-means by using the set of cluster centers (defined in step 2) as the
+initial cluster centers
+
+```{r}
+res.hk <- hkmeans(df, 4)
+```
+
+## Visualize the tree
+
+```{r}
+fviz_dend(res.hk, cex = 0.6, palette = "jco",
+          rect = TRUE, rect_border = "jco", rect_fill = TRUE)
+```
+
+## Visualize the hkmeans final clusters
+
+```{r}
+fviz_cluster(res.hk, palette = "jco", repel = TRUE,
+             ggtheme = theme_classic())
+```
+
+## Compare Results
+
+```{r indexRend}
+rand.index(res.hk$cluster, km.res$cluster)
+```
+
+## Fuzzy clustering
+
+```{r fuzcluster}
+cm <- cmeans(df, 4)
+cm
+```
+
+## Plotting clusters
+
+```{r}
+fviz_cluster(list(data = df, cluster=cm$cluster), 
+             ellipse.type = "norm",
+             ellipse.level = 0.68,
+             palette = "jco",
+             ggtheme = theme_minimal())
+```
+
+
+```{r}
+rand.index(cm$cluster, km.res$cluster)
+```
+
+
